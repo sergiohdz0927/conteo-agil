@@ -75,6 +75,9 @@ export default function DashboardScreen() {
         </View>
         <Text style={type.title}>{campaign?.name ?? 'Panel de control'}</Text>
       </View>
+      <Pressable onPress={() => router.push('/menu')} style={styles.iconBtn} accessibilityLabel="Herramientas">
+        <Icon name="grid" size={20} color={colors.accent} />
+      </Pressable>
       <Pressable onPress={onLogout} style={styles.iconBtn} accessibilityLabel="Cerrar sesión">
         <Icon name="log-out-outline" size={20} color={colors.textMuted} />
       </Pressable>
