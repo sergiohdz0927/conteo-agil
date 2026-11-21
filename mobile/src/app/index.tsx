@@ -1,17 +1,9 @@
-import { Text, View, StyleSheet } from "react-native";
+import { Redirect } from 'expo-router';
+import { useAuth } from '../store/auth-store';
 
 export default function Index() {
-  return (
-    <View style={styles.container}>
-      <Text>Edit src/app/index.tsx to edit this screen.</Text>
-    </View>
-  );
-}
+  const user = useAuth((s) => s.user);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+  if (!user) return <Redirect href="/login" />;
+  return <Redirect href={user.role === 'COUNTER' ? '/my-zones' : '/dashboard'} />;
+}
