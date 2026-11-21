@@ -1,36 +1,47 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Role } from '../src/generated/prisma/client.js';
+import {
+  CampaignStatus,
+  PrismaClient,
+  Role,
+} from '../src/generated/prisma/client.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 });
 
-const PLANT = [
+type ZoneSeed = {
+  code: string;
+  name: string;
+  counter: string; // número de empleado del contador asignado
+  stock: [string, number][]; // [sku, existencia del sistema]
+};
+
+const PLANT: { code: string; name: string; zones: ZoneSeed[] }[] = [
   {
     code: 'INS',
     name: 'Insight',
     zones: [
-      { code: 'A1', name: 'Componentes eléctricos' },
-      { code: 'A3', name: 'Tornillería y sujetadores' },
-      { code: 'A5', name: 'Láminas y perfiles' },
+      { code: 'A1', name: 'Componentes eléctricos', counter: '3000', stock: [['CAB-14AWG', 350], ['TER-ANI-14', 1200]] },
+      { code: 'A3', name: 'Tornillería y sujetadores', counter: '3000', stock: [['TOR-M6-20', 2400], ['TOR-M8-25', 1800], ['TUE-M6', 3000], ['RON-M6', 5000], ['REM-AL-532', 2750]] },
+      { code: 'A5', name: 'Láminas y perfiles', counter: '3000', stock: [['LAM-GALV-22', 85], ['PER-AL-1', 140]] },
     ],
   },
   {
     code: 'RCH',
     name: 'Reach-in',
     zones: [
-      { code: 'B1', name: 'Puertas y vidrios' },
-      { code: 'B4', name: 'Empaques y sellos' },
+      { code: 'B1', name: 'Puertas y vidrios', counter: '3001', stock: [['VID-TEMP-24', 36]] },
+      { code: 'B4', name: 'Empaques y sellos', counter: '3001', stock: [['EMP-MAG-PU', 120], ['SIL-TRANS-300', 96]] },
     ],
   },
   {
     code: 'ALM',
     name: 'Almacén general',
     zones: [
-      { code: 'C1', name: 'Refacciones' },
-      { code: 'C2', name: 'Material de empaque' },
+      { code: 'C1', name: 'Refacciones', counter: '3002', stock: [['TOR-M6-20', 600], ['TUE-M6', 800]] },
+      { code: 'C2', name: 'Material de empaque', counter: '3002', stock: [['SIL-TRANS-300', 48]] },
     ],
   },
 ];
@@ -50,50 +61,99 @@ const ITEMS = [
   { sku: 'SIL-TRANS-300', description: 'Silicón transparente 300 ml', unit: 'cartucho', boxSize: 24, unitCost: 68 },
 ];
 
+const USERS = [
+  { employeeNumber: '1000', name: 'Coordinador Demo', role: Role.COORDINATOR, area: null },
+  { employeeNumber: '2000', name: 'Supervisor Insight', role: Role.SUPERVISOR, area: 'INS' },
+  { employeeNumber: '2001', name: 'Supervisor Reach-in', role: Role.SUPERVISOR, area: 'RCH' },
+  { employeeNumber: '3000', name: 'Contador Demo', role: Role.COUNTER, area: 'INS' },
+  { employeeNumber: '3001', name: 'Contador Reach-in', role: Role.COUNTER, area: 'RCH' },
+  { employeeNumber: '3002', name: 'Contador Almacén', role: Role.COUNTER, area: 'ALM' },
+];
+
 async function main() {
-  // Áreas y zonas
+  // 1. Áreas y zonas
+  const areaIds = new Map<string, number>();
+  const zoneIds = new Map<string, number>(); // "INS-A1" -> id
   for (const a of PLANT) {
     const area = await prisma.area.upsert({
       where: { code: a.code },
       update: {},
       create: { code: a.code, name: a.name },
     });
+    areaIds.set(a.code, area.id);
     for (const z of a.zones) {
-      await prisma.zone.upsert({
+      const zone = await prisma.zone.upsert({
         where: { areaId_code: { areaId: area.id, code: z.code } },
         update: {},
-        create: { ...z, areaId: area.id },
+        create: { code: z.code, name: z.name, areaId: area.id },
       });
+      zoneIds.set(`${a.code}-${z.code}`, zone.id);
     }
   }
 
-  // Catálogo (códigos de barras inventados de 13 dígitos)
+  // 2. Catálogo (códigos de barras inventados de 13 dígitos)
+  const itemIds = new Map<string, number>();
   for (const [i, item] of ITEMS.entries()) {
     const barcode = `750100000${String(i + 1).padStart(4, '0')}`;
-    await prisma.item.upsert({
+    const saved = await prisma.item.upsert({
       where: { sku: item.sku },
       update: {},
       create: { ...item, barcode },
     });
+    itemIds.set(item.sku, saved.id);
   }
 
-  // Usuarios
-  const insight = await prisma.area.findUniqueOrThrow({ where: { code: 'INS' } });
+  // 3. Usuarios
   const passwordHash = await bcrypt.hash('conteo123', 10);
-  const users = [
-    { employeeNumber: '1000', name: 'Coordinador Demo', role: Role.COORDINATOR, areaId: null },
-    { employeeNumber: '2000', name: 'Supervisor Insight', role: Role.SUPERVISOR, areaId: insight.id },
-    { employeeNumber: '3000', name: 'Contador Demo', role: Role.COUNTER, areaId: insight.id },
-  ];
-  for (const u of users) {
-    await prisma.user.upsert({
+  const userIds = new Map<string, number>();
+  for (const u of USERS) {
+    const areaId = u.area ? areaIds.get(u.area)! : null;
+    const user = await prisma.user.upsert({
       where: { employeeNumber: u.employeeNumber },
-      update: {},
-      create: { ...u, passwordHash },
+      update: { areaId },
+      create: {
+        employeeNumber: u.employeeNumber,
+        name: u.name,
+        role: u.role,
+        areaId,
+        passwordHash,
+      },
     });
+    userIds.set(u.employeeNumber, user.id);
   }
 
-  console.log('✅ Seed listo: 3 áreas, 7 zonas, 12 artículos y 3 usuarios');
+  // 4. Campaña activa con existencias del sistema y asignaciones
+  const name = 'Inventario Nov 2026';
+  const campaign =
+    (await prisma.campaign.findFirst({ where: { name } })) ??
+    (await prisma.campaign.create({
+      data: { name, status: CampaignStatus.ACTIVE, startedAt: new Date() },
+    }));
+
+  for (const a of PLANT) {
+    for (const z of a.zones) {
+      const zoneId = zoneIds.get(`${a.code}-${z.code}`)!;
+      for (const [sku, quantity] of z.stock) {
+        const itemId = itemIds.get(sku)!;
+        await prisma.expectedStock.upsert({
+          where: { campaignId_zoneId_itemId: { campaignId: campaign.id, zoneId, itemId } },
+          update: {},
+          create: { campaignId: campaign.id, zoneId, itemId, quantity },
+        });
+      }
+      await prisma.zoneAssignment.upsert({
+        where: { campaignId_zoneId: { campaignId: campaign.id, zoneId } },
+        update: {},
+        create: {
+          campaignId: campaign.id,
+          zoneId,
+          counterId: userIds.get(z.counter)!,
+        },
+      });
+    }
+  }
+
+  console.log('✅ Seed listo: 3 áreas, 7 zonas, 12 artículos, 6 usuarios y 1 campaña activa');
 }
 
 main()
