@@ -177,7 +177,7 @@ export default function Report() {
                       {l.finalQty === null ? '—' : int(l.finalQty)}
                     </Text>
                   </View>
-                  <Text style={[styles.lineDiff, { color: LINE[l.status].color }]}>
+                  <Text style={[styles.lineDiff, { color: l.status === 'DIFF' ? ((l.diff ?? 0) < 0 ? colors.danger : colors.success) : LINE[l.status].color }]}>
                     {l.diff === null ? LINE[l.status].label : `${l.diff > 0 ? '+' : ''}${l.diff}`}
                   </Text>
                 </View>
