@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  COORDINATOR // ve toda la planta, crea campañas y asigna zonas
+  SUPERVISOR  // ve y revisa su área
+  COUNTER     // cuenta sus zonas
+}
+
+enum CampaignStatus {
+  DRAFT  // preparando
+  ACTIVE // contando
+  CLOSED // terminada
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+// ---------- Personas ----------
+
+model User {
+  id             Int      @id @default(autoincrement())
+  employeeNumber String   @unique
+  name           String
+  passwordHash   String
+  role           Role     @default(COUNTER)
+  areaId         Int?
+  area           Area?    @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  assignments ZoneAssignment[]
+  counts      Count[]
+}
+
+// ---------- Planta ----------
+
+model Area {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  code  String @unique @db.VarChar(10)
+  zones Zone[]
+  users User[]
+}
+
+model Zone {
+  id     Int    @id @default(autoincrement())
+  areaId Int
+  area   Area   @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  code   String @db.VarChar(10)
+  name   String
+
+  assignments ZoneAssignment[]
+  expected    ExpectedStock[]
+  counts      Count[]
+
+  @@unique([areaId, code])
+}
+
+model Item {
+  id          Int     @id @default(autoincrement())
+  sku         String  @unique
+  barcode     String  @unique
+  description String
+  unit        String  @default("pieza")
+  boxSize     Int?
+  unitCost    Decimal @db.Decimal(10, 2)
+
+  expected ExpectedStock[]
+  counts   Count[]
+}
+
+// ---------- Inventario ----------
+
+model Campaign {
+  id        Int            @id @default(autoincrement())
+  name      String
+  status    CampaignStatus @default(DRAFT)
+  startedAt DateTime?
+  closedAt  DateTime?
+  createdAt DateTime       @default(now())
+
+  assignments ZoneAssignment[]
+  expected    ExpectedStock[]
+  counts      Count[]
+}
+
+model ZoneAssignment {
+  id         Int              @id @default(autoincrement())
+  campaignId Int
+  campaign   Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  zoneId     Int
+  zone       Zone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  counterId  Int
+  counter    User             @relation(fields: [counterId], references: [id])
+  status     AssignmentStatus @default(PENDING)
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@unique([campaignId, zoneId])
+}
+
+model ExpectedStock {
+  id               Int      @id @default(autoincrement())
+  campaignId       Int
+  campaign         Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  zoneId           Int
+  zone             Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  itemId           Int
+  item             Item     @relation(fields: [itemId], references: [id])
+  quantity         Int
+  recountRequested Boolean  @default(false)
+
+  @@unique([campaignId, zoneId, itemId])
+}
+
+model Count {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  zoneId     Int
+  zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  itemId     Int
+  item       Item     @relation(fields: [itemId], references: [id])
+  counterId  Int
+  counter    User     @relation(fields: [counterId], references: [id])
+  quantity   Int
+  round      Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, zoneId, itemId, round])
+}
