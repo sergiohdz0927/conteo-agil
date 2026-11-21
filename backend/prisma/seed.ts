@@ -2,6 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  AssignmentStatus,
   CampaignStatus,
   PrismaClient,
   Role,
@@ -153,6 +154,31 @@ async function main() {
     }
   }
 
+    // 5. Conteos de demostración: Reach-in y Almacén ya contaron.
+  //    Insight se deja vacío para contarlo en vivo con la app.
+  const DEMO: { zone: string; counter: string; counts: [string, number][] }[] = [
+    { zone: 'RCH-B1', counter: '3001', counts: [['VID-TEMP-24', 34]] },
+    { zone: 'RCH-B4', counter: '3001', counts: [['EMP-MAG-PU', 120], ['SIL-TRANS-300', 90]] },
+    { zone: 'ALM-C1', counter: '3002', counts: [['TOR-M6-20', 600], ['TUE-M6', 830]] },
+  ];
+  for (const d of DEMO) {
+    const zoneId = zoneIds.get(d.zone)!;
+    const counterId = userIds.get(d.counter)!;
+    for (const [sku, quantity] of d.counts) {
+      const itemId = itemIds.get(sku)!;
+      await prisma.count.upsert({
+        where: {
+          campaignId_zoneId_itemId_round: { campaignId: campaign.id, zoneId, itemId, round: 1 },
+        },
+        update: {},
+        create: { campaignId: campaign.id, zoneId, itemId, counterId, quantity, round: 1 },
+      });
+    }
+    await prisma.zoneAssignment.update({
+      where: { campaignId_zoneId: { campaignId: campaign.id, zoneId } },
+      data: { status: AssignmentStatus.DONE, startedAt: new Date(), finishedAt: new Date() },
+    });
+  }
   console.log('✅ Seed listo: 3 áreas, 7 zonas, 12 artículos, 6 usuarios y 1 campaña activa');
 }
 
@@ -161,4 +187,4 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => prisma.$disconnect()); 
