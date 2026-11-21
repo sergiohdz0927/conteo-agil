@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+.expo/
+*.log
+.DS_Store
+backend/src/generated/
+
+# Configs de herramientas de IA (son tuyas, no del proyecto)
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+*.tsbuildinfo
