@@ -15,6 +15,7 @@ const TILES: { href: string; title: string; subtitle: string; icon: IconName; ro
   { href: '/plant', title: 'Áreas y zonas', subtitle: 'Estructura de la planta', icon: 'layers', roles: ['COORDINATOR', 'SUPERVISOR'] },
   { href: '/catalog', title: 'Catálogo', subtitle: 'Artículos y códigos', icon: 'barcode', roles: ['COORDINATOR', 'SUPERVISOR'] },
   { href: '/report', title: 'Reporte final', subtitle: 'Resultados del inventario', icon: 'file', roles: ['COORDINATOR', 'SUPERVISOR'] },
+  { href: '/personnel', title: 'Personal', subtitle: 'Altas y contraseñas', icon: 'user', roles: ['COORDINATOR'] },
 ];
 
 export default function Menu() {
