@@ -7,6 +7,7 @@ import { CountsModule } from './counts/counts.module.js';
 import { PlantModule } from './plant/plant.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ReportsModule } from './reports/reports.module.js';
     CampaignsModule,
     CountsModule,
     ReportsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
